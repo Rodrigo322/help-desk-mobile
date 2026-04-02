@@ -1,4 +1,4 @@
-import { ChevronDown, Menu, Plus, Search, UserRound } from "lucide-react-native";
+import { Menu, Plus, Search, UserRound } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import {
@@ -11,6 +11,7 @@ import {
   Text,
   View
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { MobileBottomNav } from "../../components/layout/mobile-bottom-nav";
@@ -24,8 +25,8 @@ const SCOPES: Array<{ label: string; value: TicketListingScope }> = [
   { label: "Atribuidos a mim", value: "assigned" }
 ];
 
-const STATUS_FILTERS: Array<{ label: string; value?: TicketStatus }> = [
-  { label: "Status", value: undefined },
+const STATUS_FILTERS: Array<{ label: string; value: string }> = [
+  { label: "Todos os chamados", value: "ALL" },
   { label: "Novo", value: "NEW" },
   { label: "Aberto", value: "OPEN" },
   { label: "Em andamento", value: "IN_PROGRESS" },
@@ -35,8 +36,8 @@ const STATUS_FILTERS: Array<{ label: string; value?: TicketStatus }> = [
   { label: "Fechado", value: "CLOSED" }
 ];
 
-const PRIORITY_FILTERS: Array<{ label: string; value?: TicketPriority }> = [
-  { label: "Prioridade", value: undefined },
+const PRIORITY_FILTERS: Array<{ label: string; value: string }> = [
+  { label: "Todas prioridades", value: "ALL" },
   { label: "Baixa", value: "LOW" },
   { label: "Media", value: "MEDIUM" },
   { label: "Alta", value: "HIGH" }
@@ -154,13 +155,12 @@ function TicketRow({ ticket, onPress }: TicketRowProps) {
 
 export function TicketsScreen() {
   const router = useRouter();
-  const [scopeIndex, setScopeIndex] = useState(0);
-  const [statusIndex, setStatusIndex] = useState(0);
-  const [priorityIndex, setPriorityIndex] = useState(0);
+  const [scope, setScope] = useState<TicketListingScope>("department");
+  const [statusValue, setStatusValue] = useState("ALL");
+  const [priorityValue, setPriorityValue] = useState("ALL");
 
-  const scope = SCOPES[scopeIndex]?.value;
-  const status = STATUS_FILTERS[statusIndex]?.value;
-  const priority = PRIORITY_FILTERS[priorityIndex]?.value;
+  const status = statusValue === "ALL" ? undefined : (statusValue as TicketStatus);
+  const priority = priorityValue === "ALL" ? undefined : (priorityValue as TicketPriority);
 
   const ticketsQuery = useTickets({
     scope,
@@ -207,29 +207,44 @@ export function TicketsScreen() {
         </View>
 
         <View style={styles.filtersRow}>
-          <Pressable
-            style={styles.filterButton}
-            onPress={() => setStatusIndex((prev) => (prev + 1) % STATUS_FILTERS.length)}
-          >
-            <Text style={styles.filterButtonText}>{STATUS_FILTERS[statusIndex]?.label}</Text>
-            <ChevronDown size={14} color="#334155" />
-          </Pressable>
+          <View style={styles.filterButton}>
+            <Picker
+              selectedValue={statusValue}
+              onValueChange={(value) => setStatusValue(String(value))}
+              style={styles.filterPicker}
+              dropdownIconColor="#334155"
+            >
+              {STATUS_FILTERS.map((filter) => (
+                <Picker.Item key={filter.value} label={filter.label} value={filter.value} />
+              ))}
+            </Picker>
+          </View>
 
-          <Pressable
-            style={styles.filterButton}
-            onPress={() => setPriorityIndex((prev) => (prev + 1) % PRIORITY_FILTERS.length)}
-          >
-            <Text style={styles.filterButtonText}>{PRIORITY_FILTERS[priorityIndex]?.label}</Text>
-            <ChevronDown size={14} color="#334155" />
-          </Pressable>
+          <View style={styles.filterButton}>
+            <Picker
+              selectedValue={priorityValue}
+              onValueChange={(value) => setPriorityValue(String(value))}
+              style={styles.filterPicker}
+              dropdownIconColor="#334155"
+            >
+              {PRIORITY_FILTERS.map((filter) => (
+                <Picker.Item key={filter.value} label={filter.label} value={filter.value} />
+              ))}
+            </Picker>
+          </View>
 
-          <Pressable
-            style={styles.filterButton}
-            onPress={() => setScopeIndex((prev) => (prev + 1) % SCOPES.length)}
-          >
-            <Text style={styles.filterButtonText}>{SCOPES[scopeIndex]?.label}</Text>
-            <ChevronDown size={14} color="#334155" />
-          </Pressable>
+          <View style={styles.filterButton}>
+            <Picker
+              selectedValue={scope}
+              onValueChange={(value) => setScope(value as TicketListingScope)}
+              style={styles.filterPicker}
+              dropdownIconColor="#334155"
+            >
+              {SCOPES.map((filter) => (
+                <Picker.Item key={filter.value} label={filter.label} value={filter.value} />
+              ))}
+            </Picker>
+          </View>
         </View>
 
         {errorMessage ? (
@@ -321,8 +336,8 @@ const styles = StyleSheet.create({
     color: "#0f172a"
   },
   headerLogo: {
-    width: 150,
-    height: 24
+    width: 190,
+    height: 34
   },
   filtersRow: {
     flexDirection: "row",
@@ -336,16 +351,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#d1d5db",
     backgroundColor: "#e5e7eb",
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between"
+    overflow: "hidden",
+    height: 52,
+    justifyContent: "center"
   },
-  filterButtonText: {
+  filterPicker: {
     color: "#334155",
     fontSize: 12,
-    fontWeight: "600"
+    marginLeft: -6
   },
   listContent: {
     padding: 12,
