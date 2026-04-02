@@ -23,8 +23,8 @@ export default function ProtectedLayout() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="notifications" options={{ headerShown: false }} />
       <Stack.Screen name="tickets/index" options={{ headerShown: false }} />
-      <Stack.Screen name="tickets/create" options={{ title: "Novo chamado" }} />
-      <Stack.Screen name="tickets/[id]" options={{ title: "Detalhes do chamado" }} />
+      <Stack.Screen name="tickets/create" options={{ headerShown: false }} />
+      <Stack.Screen name="tickets/[id]" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -1,9 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ArrowLeft, FileText } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -15,8 +17,10 @@ import {
   TextInput,
   View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useMemo, useState } from "react";
 
+import { MobileBottomNav } from "../../components/layout/mobile-bottom-nav";
 import { useAuth } from "../../hooks/use-auth";
 import { useDepartments } from "../../hooks/use-departments";
 import { useTicketAttachments, useUploadTicketAttachment } from "../../hooks/use-ticket-attachments";
@@ -72,6 +76,34 @@ function mapPriorityLabel(priority: TicketPriority) {
   }
 }
 
+function getStatusBadgeColors(status: TicketStatus) {
+  if (status === "CLOSED") {
+    return { backgroundColor: "#e2e8f0", color: "#334155" };
+  }
+
+  if (status === "RESOLVED") {
+    return { backgroundColor: "#dcfce7", color: "#15803d" };
+  }
+
+  if (status === "IN_PROGRESS") {
+    return { backgroundColor: "#dbeafe", color: "#1d4ed8" };
+  }
+
+  return { backgroundColor: "#ffedd5", color: "#c2410c" };
+}
+
+function getPriorityBadgeColors(priority: TicketPriority) {
+  if (priority === "HIGH") {
+    return { backgroundColor: "#fee2e2", color: "#dc2626" };
+  }
+
+  if (priority === "MEDIUM") {
+    return { backgroundColor: "#fef9c3", color: "#a16207" };
+  }
+
+  return { backgroundColor: "#e2e8f0", color: "#334155" };
+}
+
 function formatDate(date?: string | null) {
   if (!date) {
     return "-";
@@ -83,8 +115,11 @@ function formatDate(date?: string | null) {
   }
 
   return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short"
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
   }).format(parsed);
 }
 
@@ -108,23 +143,10 @@ function buildAttachmentUrl(fileUrl: string): string {
   return `${serverBaseUrl}${normalizedPath}`;
 }
 
-type DetailsRowProps = {
-  label: string;
-  value: string;
-};
-
-function DetailsRow({ label, value }: DetailsRowProps) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
-  );
-}
-
 export function TicketDetailsScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const ticketId = getRouteTicketId(params.id);
+  const router = useRouter();
   const { user } = useAuth();
   const canCreateInternalComment = user?.role === "MANAGER" || user?.role === "ADMIN";
 
@@ -293,6 +315,7 @@ export function TicketDetailsScreen() {
 
   const originDepartmentName = departmentsById.get(ticket.originDepartmentId) ?? ticket.originDepartmentId;
   const targetDepartmentName = departmentsById.get(ticket.targetDepartmentId) ?? ticket.targetDepartmentId;
+  const requesterName = ticket.createdByUserName ?? ticket.createdByUserId;
 
   const canAssignTicket = Boolean(
     user &&
@@ -313,270 +336,322 @@ export function TicketDetailsScreen() {
   const canCloseTicket = canManageTicket && ticket.status !== "CLOSED";
   const canUpdatePriority = canManageTicket;
 
+  const assignedName =
+    ticket.assignedToUserId === user?.id
+      ? "Voce"
+      : ticket.assignedToUserId ?? "Nao atribuido";
+
+  const statusBadge = getStatusBadgeColors(ticket.status);
+  const priorityBadge = getPriorityBadgeColors(ticket.priority);
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.select({ ios: "padding", android: "height" })}
-      keyboardVerticalOffset={Platform.select({ ios: 20, android: 0 })}
-    >
-      <ScrollView
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <KeyboardAvoidingView
         style={styles.container}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.select({ ios: "interactive", android: "on-drag" })}
+        behavior={Platform.select({ ios: "padding", android: "height" })}
+        keyboardVerticalOffset={Platform.select({ ios: 16, android: 0 })}
       >
-      <Text style={styles.title}>{ticket.title}</Text>
-      <Text style={styles.subtitle}>ID: {ticket.id}</Text>
-
-      <View style={styles.badgesRow}>
-        <Text style={styles.badge}>{mapStatusLabel(ticket.status)}</Text>
-        <Text style={styles.badge}>{mapPriorityLabel(ticket.priority)}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Descricao</Text>
-        <Text style={styles.description}>{ticket.description}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Detalhes</Text>
-        <DetailsRow label="Solicitante" value={ticket.createdByUserName ?? ticket.createdByUserId} />
-        <DetailsRow label="Departamento origem" value={originDepartmentName} />
-        <DetailsRow label="Departamento destino" value={targetDepartmentName} />
-        <DetailsRow label="Responsavel" value={ticket.assignedToUserId ?? "Nao atribuido"} />
-        <DetailsRow label="Aberto em" value={formatDate(ticket.createdAt)} />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Acoes do chamado</Text>
-        {canAssignTicket ? (
-          <Pressable
-            style={[styles.primaryButton, assignTicketMutation.isPending && styles.primaryButtonDisabled]}
-            disabled={assignTicketMutation.isPending}
-            onPress={() => {
-              void handleAssignTicketToSelf();
-            }}
+        <View style={styles.container}>
+          <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.select({ ios: "interactive", android: "on-drag" })}
           >
-            {assignTicketMutation.isPending ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Pegar chamado</Text>
-            )}
-          </Pressable>
-        ) : null}
-
-        <View style={styles.horizontalActions}>
-          {canResolveTicket ? (
-            <Pressable
-              style={[styles.secondaryActionButton, resolveTicketMutation.isPending && styles.secondaryButtonDisabled]}
-              disabled={resolveTicketMutation.isPending}
-              onPress={() => {
-                void handleResolveTicket();
-              }}
-            >
-              {resolveTicketMutation.isPending ? (
-                <ActivityIndicator size="small" color="#0b3f77" />
-              ) : (
-                <Text style={styles.secondaryActionText}>Resolver</Text>
-              )}
-            </Pressable>
-          ) : null}
-
-          {canCloseTicket ? (
-            <Pressable
-              style={[styles.secondaryActionButton, closeTicketMutation.isPending && styles.secondaryButtonDisabled]}
-              disabled={closeTicketMutation.isPending}
-              onPress={() => {
-                void handleCloseTicket();
-              }}
-            >
-              {closeTicketMutation.isPending ? (
-                <ActivityIndicator size="small" color="#0b3f77" />
-              ) : (
-                <Text style={styles.secondaryActionText}>Concluir</Text>
-              )}
-            </Pressable>
-          ) : null}
-        </View>
-
-        <Text style={styles.helperText}>Prioridade</Text>
-        <View style={styles.priorityRow}>
-          {PRIORITY_OPTIONS.map((option) => {
-            const isCurrentPriority = ticket.priority === option.value;
-
-            return (
-              <Pressable
-                key={option.value}
-                style={[
-                  styles.priorityChip,
-                  isCurrentPriority && styles.priorityChipActive,
-                  (!canUpdatePriority || updatePriorityMutation.isPending) && styles.secondaryButtonDisabled
-                ]}
-                disabled={!canUpdatePriority || updatePriorityMutation.isPending || isCurrentPriority}
-                onPress={() => {
-                  void handleUpdatePriority(option.value);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.priorityChipText,
-                    isCurrentPriority && styles.priorityChipTextActive
-                  ]}
-                >
-                  {option.label}
-                </Text>
+            <View style={styles.headerRow}>
+              <Pressable style={styles.headerIconButton} onPress={() => router.back()}>
+                <ArrowLeft size={20} color="#123A74" />
               </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Anexos</Text>
-          <Pressable
-            style={[
-              styles.secondaryButton,
-              uploadAttachmentMutation.isPending && styles.secondaryButtonDisabled
-            ]}
-            disabled={uploadAttachmentMutation.isPending}
-            onPress={() => {
-              void handlePickAndUploadAttachment();
-            }}
-          >
-            {uploadAttachmentMutation.isPending ? (
-              <ActivityIndicator size="small" color="#0b3f77" />
-            ) : (
-              <Text style={styles.secondaryButtonText}>Adicionar arquivo</Text>
-            )}
-          </Pressable>
-        </View>
-
-        {attachmentsQuery.isLoading ? (
-          <ActivityIndicator size="small" color="#0b3f77" />
-        ) : attachments.length === 0 ? (
-          <Text style={styles.helperText}>Nenhum anexo encontrado.</Text>
-        ) : (
-          <View style={styles.itemsStack}>
-            {attachments.map((attachment) => (
-              <Pressable
-                key={attachment.id}
-                style={styles.itemCard}
-                onPress={() => {
-                  void Linking.openURL(buildAttachmentUrl(attachment.fileUrl));
-                }}
-              >
-                <Text style={styles.itemTitle}>{attachment.fileName}</Text>
-                <Text style={styles.itemSubtitle}>{attachment.mimeType}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Comentarios</Text>
-
-        <Controller
-          control={control}
-          name="content"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <View style={styles.field}>
-              <TextInput
-                style={[styles.input, styles.commentTextArea]}
-                multiline
-                textAlignVertical="top"
-                numberOfLines={4}
-                placeholder="Digite seu comentario"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
+              <Text style={styles.headerTitle}>Chamado #{ticket.id.slice(0, 8)}</Text>
+              <Image
+                source={require("../../../assets/brand/new-holland-blue.png")}
+                style={styles.headerLogo}
+                resizeMode="contain"
               />
-              {errors.content?.message ? (
-                <Text style={styles.errorInline}>{errors.content.message}</Text>
-              ) : null}
             </View>
-          )}
-        />
 
-        {canCreateInternalComment ? (
-          <View style={styles.internalSwitchRow}>
-            <Text style={styles.helperText}>Comentario interno</Text>
-            <Switch
-              value={isInternalComment}
-              onValueChange={(value) => {
-                setValue("isInternal", value, { shouldDirty: true });
-              }}
-            />
-          </View>
-        ) : null}
+            <View style={styles.badgesRow}>
+              <Text style={[styles.badge, statusBadge]}>{mapStatusLabel(ticket.status)}</Text>
+              <Text style={[styles.badge, priorityBadge]}>{mapPriorityLabel(ticket.priority)}</Text>
+            </View>
 
-        <Pressable
-          style={[
-            styles.primaryButton,
-            createCommentMutation.isPending && styles.primaryButtonDisabled
-          ]}
-          disabled={createCommentMutation.isPending}
-          onPress={handleSubmit(handleCreateComment)}
-        >
-          {createCommentMutation.isPending ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Text style={styles.primaryButtonText}>Enviar comentario</Text>
-          )}
-        </Pressable>
+            <View style={styles.problemCard}>
+              <Text style={styles.problemLabel}>Problema relatado</Text>
+              <Text style={styles.problemTitle}>{ticket.title}</Text>
+              <View style={styles.infoDivider} />
 
-        {commentsQuery.isLoading ? (
-          <ActivityIndicator size="small" color="#0b3f77" />
-        ) : comments.length === 0 ? (
-          <Text style={styles.helperText}>Nenhum comentario encontrado.</Text>
-        ) : (
-          <View style={styles.itemsStack}>
-            {comments.map((comment) => (
-              <View key={comment.id} style={styles.itemCard}>
-                <View style={styles.commentHeader}>
-                  <Text style={styles.itemTitle}>{comment.author.name}</Text>
-                  {comment.isInternal ? <Text style={styles.internalBadge}>Interno</Text> : null}
+              <View style={styles.infoGrid}>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Solicitante</Text>
+                  <Text style={styles.infoValue}>{requesterName}</Text>
                 </View>
-                <Text style={styles.itemSubtitle}>{formatDate(comment.createdAt)}</Text>
-                <Text style={styles.commentBody}>{comment.content}</Text>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Departamento</Text>
+                  <Text style={styles.infoValue}>{targetDepartmentName}</Text>
+                </View>
               </View>
-            ))}
-          </View>
-        )}
-      </View>
+            </View>
 
-      {actionMessage ? (
-        <View style={styles.successBox}>
-          <Text style={styles.successText}>{actionMessage}</Text>
+            <View style={styles.sectionWrap}>
+              <Text style={styles.sectionHeading}>Descricao do problema</Text>
+              <View style={styles.sectionCard}>
+                <Text style={styles.description}>{ticket.description}</Text>
+
+                <View style={styles.attachmentsHeader}>
+                  <Text style={styles.sectionSubheading}>Anexos ({attachments.length})</Text>
+                  <Pressable
+                    style={[styles.smallButton, uploadAttachmentMutation.isPending && styles.disabledButton]}
+                    disabled={uploadAttachmentMutation.isPending}
+                    onPress={() => {
+                      void handlePickAndUploadAttachment();
+                    }}
+                  >
+                    {uploadAttachmentMutation.isPending ? (
+                      <ActivityIndicator size="small" color="#123A74" />
+                    ) : (
+                      <Text style={styles.smallButtonText}>Adicionar</Text>
+                    )}
+                  </Pressable>
+                </View>
+
+                {attachmentsQuery.isLoading ? (
+                  <ActivityIndicator size="small" color="#0b3f77" />
+                ) : attachments.length === 0 ? (
+                  <Text style={styles.helperText}>Nenhum anexo encontrado.</Text>
+                ) : (
+                  <View style={styles.attachmentsGrid}>
+                    {attachments.map((attachment) => (
+                      <Pressable
+                        key={attachment.id}
+                        style={styles.attachmentCard}
+                        onPress={() => {
+                          void Linking.openURL(buildAttachmentUrl(attachment.fileUrl));
+                        }}
+                      >
+                        <FileText size={20} color="#123A74" />
+                        <Text numberOfLines={2} style={styles.attachmentName}>{attachment.fileName}</Text>
+                        <Text style={styles.attachmentMeta}>{attachment.mimeType}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.sectionWrap}>
+              <Text style={styles.sectionHeading}>Acoes do chamado</Text>
+              <View style={styles.sectionCard}>
+                <View style={styles.detailsGrid}>
+                  <View style={styles.detailsItem}>
+                    <Text style={styles.detailsLabel}>Origem</Text>
+                    <Text style={styles.detailsValue}>{originDepartmentName}</Text>
+                  </View>
+                  <View style={styles.detailsItem}>
+                    <Text style={styles.detailsLabel}>Destino</Text>
+                    <Text style={styles.detailsValue}>{targetDepartmentName}</Text>
+                  </View>
+                  <View style={styles.detailsItem}>
+                    <Text style={styles.detailsLabel}>Responsavel</Text>
+                    <Text style={styles.detailsValue}>{assignedName}</Text>
+                  </View>
+                  <View style={styles.detailsItem}>
+                    <Text style={styles.detailsLabel}>Abertura</Text>
+                    <Text style={styles.detailsValue}>{formatDate(ticket.createdAt)}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.sectionSubheading}>Prioridade</Text>
+                <View style={styles.priorityRow}>
+                  {PRIORITY_OPTIONS.map((option) => {
+                    const isCurrentPriority = ticket.priority === option.value;
+
+                    return (
+                      <Pressable
+                        key={option.value}
+                        style={[
+                          styles.priorityChip,
+                          isCurrentPriority && styles.priorityChipActive,
+                          (!canUpdatePriority || updatePriorityMutation.isPending) && styles.disabledButton
+                        ]}
+                        disabled={!canUpdatePriority || updatePriorityMutation.isPending || isCurrentPriority}
+                        onPress={() => {
+                          void handleUpdatePriority(option.value);
+                        }}
+                      >
+                        <Text style={[styles.priorityChipText, isCurrentPriority && styles.priorityChipTextActive]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.sectionWrap}>
+              <Text style={styles.sectionHeading}>Historico e comentarios</Text>
+              <View style={styles.sectionCard}>
+                <Controller
+                  control={control}
+                  name="content"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <View style={styles.field}>
+                      <TextInput
+                        style={[styles.input, styles.commentInput]}
+                        multiline
+                        textAlignVertical="top"
+                        numberOfLines={4}
+                        placeholder="Digite um comentario"
+                        placeholderTextColor="#94a3b8"
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value}
+                      />
+                      {errors.content?.message ? (
+                        <Text style={styles.errorInline}>{errors.content.message}</Text>
+                      ) : null}
+                    </View>
+                  )}
+                />
+
+                {canCreateInternalComment ? (
+                  <View style={styles.internalSwitchRow}>
+                    <Text style={styles.helperText}>Comentario interno</Text>
+                    <Switch
+                      value={isInternalComment}
+                      onValueChange={(value) => {
+                        setValue("isInternal", value, { shouldDirty: true });
+                      }}
+                    />
+                  </View>
+                ) : null}
+
+                <Pressable
+                  style={[styles.smallPrimaryButton, createCommentMutation.isPending && styles.disabledButton]}
+                  disabled={createCommentMutation.isPending}
+                  onPress={handleSubmit(handleCreateComment)}
+                >
+                  {createCommentMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.smallPrimaryButtonText}>Enviar comentario</Text>
+                  )}
+                </Pressable>
+
+                {commentsQuery.isLoading ? (
+                  <ActivityIndicator size="small" color="#0b3f77" />
+                ) : comments.length === 0 ? (
+                  <Text style={styles.helperText}>Nenhum comentario encontrado.</Text>
+                ) : (
+                  <View style={styles.timelineStack}>
+                    {comments.map((comment) => (
+                      <View key={comment.id} style={styles.timelineItem}>
+                        <View style={styles.timelineDot} />
+                        <View style={styles.timelineCard}>
+                          <View style={styles.timelineHeader}>
+                            <Text style={styles.timelineAuthor}>{comment.author.name}</Text>
+                            <Text style={styles.timelineTime}>{formatDate(comment.createdAt)}</Text>
+                          </View>
+                          {comment.isInternal ? <Text style={styles.internalBadge}>Interno</Text> : null}
+                          <Text style={styles.timelineContent}>{comment.content}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {actionMessage ? (
+              <View style={styles.successBox}>
+                <Text style={styles.successText}>{actionMessage}</Text>
+              </View>
+            ) : null}
+
+            {screenError ? (
+              <View style={styles.screenErrorBox}>
+                <Text style={styles.screenErrorText}>{screenError}</Text>
+              </View>
+            ) : null}
+          </ScrollView>
+
+          <View style={styles.stickyActionWrap}>
+            {canAssignTicket ? (
+              <Pressable
+                style={[styles.mainActionButton, assignTicketMutation.isPending && styles.disabledButton]}
+                disabled={assignTicketMutation.isPending}
+                onPress={() => {
+                  void handleAssignTicketToSelf();
+                }}
+              >
+                {assignTicketMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.mainActionButtonText}>Iniciar atendimento</Text>
+                )}
+              </Pressable>
+            ) : canResolveTicket ? (
+              <Pressable
+                style={[styles.mainActionButton, resolveTicketMutation.isPending && styles.disabledButton]}
+                disabled={resolveTicketMutation.isPending}
+                onPress={() => {
+                  void handleResolveTicket();
+                }}
+              >
+                {resolveTicketMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.mainActionButtonText}>Marcar como resolvido</Text>
+                )}
+              </Pressable>
+            ) : canCloseTicket ? (
+              <Pressable
+                style={[styles.mainActionButton, closeTicketMutation.isPending && styles.disabledButton]}
+                disabled={closeTicketMutation.isPending}
+                onPress={() => {
+                  void handleCloseTicket();
+                }}
+              >
+                {closeTicketMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.mainActionButtonText}>Concluir chamado</Text>
+                )}
+              </Pressable>
+            ) : (
+              <View style={styles.mainActionButtonDisabled}>
+                <Text style={styles.mainActionButtonDisabledText}>Sem acoes disponiveis</Text>
+              </View>
+            )}
+          </View>
+
+          <MobileBottomNav />
         </View>
-      ) : null}
-
-        {screenError ? (
-          <View style={styles.screenErrorBox}>
-            <Text style={styles.screenErrorText}>{screenError}</Text>
-          </View>
-        ) : null}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#f3f4f7"
+  },
   container: {
     flex: 1,
-    backgroundColor: "#f5f7fb"
+    backgroundColor: "#f3f4f7"
   },
   content: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: 24
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 186,
+    gap: 14
   },
   loaderContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f5f7fb",
+    backgroundColor: "#f3f4f7",
     gap: 8
   },
   loaderText: {
@@ -585,7 +660,7 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    backgroundColor: "#f5f7fb",
+    backgroundColor: "#f3f4f7",
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
@@ -602,14 +677,32 @@ const styles = StyleSheet.create({
     color: "#b91c1c",
     textAlign: "center"
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#0f172a"
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
   },
-  subtitle: {
-    fontSize: 13,
-    color: "#64748b"
+  headerIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#dbe2ef",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff"
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#102448",
+    flex: 1,
+    marginLeft: 10,
+    marginRight: 10
+  },
+  headerLogo: {
+    width: 118,
+    height: 20
   },
   badgesRow: {
     flexDirection: "row",
@@ -617,114 +710,88 @@ const styles = StyleSheet.create({
   },
   badge: {
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#e2e8f0",
-    color: "#334155",
-    fontWeight: "600",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    fontWeight: "700",
     fontSize: 12
   },
-  section: {
-    borderRadius: 12,
+  problemCard: {
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "#dbe2ef",
     backgroundColor: "#ffffff",
-    padding: 12,
+    padding: 14,
     gap: 10
   },
-  sectionHeader: {
+  problemLabel: {
+    fontSize: 11,
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    fontWeight: "700"
+  },
+  problemTitle: {
+    fontSize: 30,
+    fontWeight: "800",
+    color: "#1e293b",
+    lineHeight: 40
+  },
+  infoDivider: {
+    height: 1,
+    backgroundColor: "#e5eaf3"
+  },
+  infoGrid: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    gap: 10
+  },
+  infoItem: {
+    flex: 1,
+    gap: 4
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: "#64748b",
+    textTransform: "uppercase",
+    fontWeight: "700"
+  },
+  infoValue: {
+    fontSize: 18,
+    color: "#1e293b",
+    fontWeight: "700"
+  },
+  sectionWrap: {
     gap: 8
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#0f172a"
+  sectionHeading: {
+    fontSize: 25,
+    fontWeight: "800",
+    color: "#1e3a8a"
+  },
+  sectionCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#dbe2ef",
+    backgroundColor: "#ffffff",
+    padding: 14,
+    gap: 12
   },
   description: {
     color: "#334155",
-    fontSize: 14
+    fontSize: 17,
+    lineHeight: 25
   },
-  row: {
-    gap: 2
-  },
-  rowLabel: {
-    color: "#64748b",
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 0.6
-  },
-  rowValue: {
-    color: "#0f172a",
-    fontSize: 14,
-    fontWeight: "600"
-  },
-  helperText: {
-    color: "#64748b",
-    fontSize: 13
-  },
-  itemsStack: {
-    gap: 8
-  },
-  itemCard: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#f8fafc",
-    padding: 10,
-    gap: 4
-  },
-  itemTitle: {
-    color: "#0f172a",
-    fontWeight: "700",
-    fontSize: 13
-  },
-  itemSubtitle: {
-    color: "#64748b",
-    fontSize: 12
-  },
-  field: {
-    gap: 4
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 10,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: "#0f172a"
-  },
-  commentTextArea: {
-    minHeight: 88
-  },
-  errorInline: {
-    color: "#dc2626",
-    fontSize: 12
-  },
-  internalSwitchRow: {
+  attachmentsHeader: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center"
+    gap: 10
   },
-  primaryButton: {
-    borderRadius: 10,
-    backgroundColor: "#0b3f77",
-    paddingVertical: 11,
-    alignItems: "center"
-  },
-  primaryButtonDisabled: {
-    opacity: 0.7
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 14,
+  sectionSubheading: {
+    color: "#475569",
+    fontSize: 16,
     fontWeight: "700"
   },
-  secondaryButton: {
+  smallButton: {
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#93c5fd",
@@ -732,31 +799,54 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8
   },
-  secondaryButtonDisabled: {
-    opacity: 0.7
-  },
-  secondaryButtonText: {
+  smallButtonText: {
     color: "#0b3f77",
     fontSize: 12,
     fontWeight: "700"
   },
-  horizontalActions: {
+  attachmentsGrid: {
     flexDirection: "row",
-    gap: 8
+    flexWrap: "wrap",
+    gap: 10
   },
-  secondaryActionButton: {
-    flex: 1,
-    borderRadius: 10,
+  attachmentCard: {
+    width: "48%",
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#e2e8f0",
     backgroundColor: "#f8fafc",
-    alignItems: "center",
-    paddingVertical: 10
+    padding: 10,
+    gap: 6
   },
-  secondaryActionText: {
-    color: "#334155",
+  attachmentName: {
+    color: "#1e293b",
     fontWeight: "700",
     fontSize: 13
+  },
+  attachmentMeta: {
+    color: "#64748b",
+    fontSize: 12
+  },
+  detailsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  detailsItem: {
+    width: "48%",
+    gap: 4
+  },
+  detailsLabel: {
+    color: "#64748b",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    fontWeight: "700"
+  },
+  detailsValue: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "700"
   },
   priorityRow: {
     flexDirection: "row",
@@ -782,10 +872,80 @@ const styles = StyleSheet.create({
   priorityChipTextActive: {
     color: "#ffffff"
   },
-  commentHeader: {
+  field: {
+    gap: 4
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#dbe2ef",
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#0f172a"
+  },
+  commentInput: {
+    minHeight: 90
+  },
+  errorInline: {
+    color: "#dc2626",
+    fontSize: 12
+  },
+  internalSwitchRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6
+    justifyContent: "space-between",
+    alignItems: "center"
+  },
+  smallPrimaryButton: {
+    borderRadius: 10,
+    backgroundColor: "#0b3f77",
+    paddingVertical: 11,
+    alignItems: "center"
+  },
+  smallPrimaryButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700"
+  },
+  timelineStack: {
+    gap: 10
+  },
+  timelineItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 10,
+    backgroundColor: "#123A74"
+  },
+  timelineCard: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
+    padding: 10,
+    gap: 4
+  },
+  timelineHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  timelineAuthor: {
+    color: "#0f172a",
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  timelineTime: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "600"
   },
   internalBadge: {
     backgroundColor: "#fef3c7",
@@ -794,11 +954,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     fontSize: 11,
-    fontWeight: "700"
+    fontWeight: "700",
+    alignSelf: "flex-start"
   },
-  commentBody: {
+  timelineContent: {
     fontSize: 13,
-    color: "#1e293b"
+    color: "#334155",
+    lineHeight: 18
+  },
+  helperText: {
+    color: "#64748b",
+    fontSize: 13
   },
   successBox: {
     borderRadius: 10,
@@ -821,5 +987,40 @@ const styles = StyleSheet.create({
   screenErrorText: {
     color: "#b91c1c",
     fontSize: 13
+  },
+  stickyActionWrap: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 68,
+    zIndex: 4
+  },
+  mainActionButton: {
+    borderRadius: 14,
+    backgroundColor: "#0b3f77",
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  mainActionButtonText: {
+    color: "#ffffff",
+    fontSize: 17,
+    fontWeight: "700"
+  },
+  mainActionButtonDisabled: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#dbe2ef",
+    backgroundColor: "#f1f5f9",
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  mainActionButtonDisabledText: {
+    color: "#64748b",
+    fontWeight: "700"
+  },
+  disabledButton: {
+    opacity: 0.7
   }
 });

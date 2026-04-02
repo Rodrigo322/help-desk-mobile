@@ -1,8 +1,9 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Lock, Mail } from "lucide-react-native";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -55,9 +56,11 @@ export function SignInScreen() {
           keyboardDismissMode={Platform.select({ ios: "interactive", android: "on-drag" })}
         >
           <View style={styles.brandBlock}>
-            <View style={styles.logoBox}>
-              <Text style={styles.logoText}>JT</Text>
-            </View>
+            <Image
+              source={require("../../../assets/brand/justi-new-holland-white.png")}
+              style={styles.brandLogo}
+              resizeMode="contain"
+            />
             <Text style={styles.brandTitle}>Justi Tratores</Text>
             <Text style={styles.brandSubtitle}>Solucoes em maquinario pesado</Text>
           </View>
@@ -73,7 +76,7 @@ export function SignInScreen() {
                 <View style={styles.field}>
                   <Text style={styles.label}>E-mail</Text>
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="mail-outline" size={18} color="#94a3b8" />
+                    <Mail size={18} color="#94a3b8" />
                     <TextInput
                       style={styles.input}
                       keyboardType="email-address"
@@ -100,7 +103,7 @@ export function SignInScreen() {
                 <View style={styles.field}>
                   <Text style={styles.label}>Senha</Text>
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="lock-closed-outline" size={18} color="#94a3b8" />
+                    <Lock size={18} color="#94a3b8" />
                     <TextInput
                       style={styles.input}
                       secureTextEntry
@@ -160,18 +163,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6
   },
-  logoBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: "#0B4B97"
+  brandLogo: {
+    width: 220,
+    height: 60
   },
   brandTitle: {
     fontSize: 30,

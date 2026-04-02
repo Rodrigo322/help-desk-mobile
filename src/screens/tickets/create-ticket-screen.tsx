@@ -1,8 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ArrowLeft, ChevronDown, ChevronUp, Paperclip } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,8 +14,10 @@ import {
   TextInput,
   View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useMemo, useState } from "react";
 
+import { MobileBottomNav } from "../../components/layout/mobile-bottom-nav";
 import { useDepartments } from "../../hooks/use-departments";
 import { useCreateTicket } from "../../hooks/use-tickets";
 import { createTicketSchema, CreateTicketFormData } from "../../schemas/tickets/create-ticket-schema";
@@ -31,6 +35,7 @@ export function CreateTicketScreen() {
   const createTicketMutation = useCreateTicket();
   const departmentsQuery = useDepartments();
   const [submitErrorMessage, setSubmitErrorMessage] = useState<string | null>(null);
+  const [isDepartmentListOpen, setIsDepartmentListOpen] = useState(false);
 
   const activeDepartments = useMemo(() => {
     return (departmentsQuery.data?.departments ?? []).filter((department) => department.isActive);
@@ -55,6 +60,10 @@ export function CreateTicketScreen() {
   const selectedPriority = watch("priority");
   const selectedDepartmentId = watch("targetDepartmentId");
 
+  const selectedDepartment = activeDepartments.find(
+    (department) => department.id === selectedDepartmentId
+  );
+
   async function onSubmit(values: CreateTicketFormData) {
     try {
       setSubmitErrorMessage(null);
@@ -66,218 +75,401 @@ export function CreateTicketScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.select({ ios: "padding", android: "height" })}
-      keyboardVerticalOffset={Platform.select({ ios: 20, android: 0 })}
-    >
-      <ScrollView
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <KeyboardAvoidingView
         style={styles.container}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.select({ ios: "interactive", android: "on-drag" })}
+        behavior={Platform.select({ ios: "padding", android: "height" })}
+        keyboardVerticalOffset={Platform.select({ ios: 16, android: 0 })}
       >
-        <Text style={styles.title}>Novo chamado</Text>
-        <Text style={styles.subtitle}>Abra um chamado para um departamento de destino.</Text>
+        <View style={styles.container}>
+          <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.select({ ios: "interactive", android: "on-drag" })}
+          >
+            <View style={styles.headerRow}>
+              <Pressable style={styles.headerIconButton} onPress={() => router.back()}>
+                <ArrowLeft size={20} color="#123A74" />
+              </Pressable>
+              <Text style={styles.headerTitle}>Novo Chamado</Text>
+              <Image
+                source={require("../../../assets/brand/new-holland-blue.png")}
+                style={styles.headerLogo}
+                resizeMode="contain"
+              />
+            </View>
 
-      <Controller
-        control={control}
-        name="title"
-        render={({ field: { onChange, onBlur, value } }) => (
-          <View style={styles.field}>
-            <Text style={styles.label}>Titulo</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Falha no sistema"
-              onBlur={onBlur}
-              onChangeText={onChange}
-              value={value}
-            />
-            {errors.title?.message ? <Text style={styles.errorText}>{errors.title.message}</Text> : null}
-          </View>
-        )}
-      />
+            <Text style={styles.subtitle}>
+              Preencha os detalhes abaixo para solicitar assistencia tecnica ao departamento de destino.
+            </Text>
 
-      <Controller
-        control={control}
-        name="description"
-        render={({ field: { onChange, onBlur, value } }) => (
-          <View style={styles.field}>
-            <Text style={styles.label}>Descricao</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              multiline
-              numberOfLines={5}
-              textAlignVertical="top"
-              placeholder="Descreva o problema em detalhes"
-              onBlur={onBlur}
-              onChangeText={onChange}
-              value={value}
-            />
-            {errors.description?.message ? (
-              <Text style={styles.errorText}>{errors.description.message}</Text>
-            ) : null}
-          </View>
-        )}
-      />
+            <View style={styles.formCard}>
+              <Controller
+                control={control}
+                name="title"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Titulo</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ex: Falha no sistema hidraulico"
+                      placeholderTextColor="#94a3b8"
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                    />
+                    {errors.title?.message ? <Text style={styles.errorText}>{errors.title.message}</Text> : null}
+                  </View>
+                )}
+              />
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Prioridade</Text>
-        <View style={styles.optionsWrap}>
-          {PRIORITY_OPTIONS.map((option) => (
-            <Pressable
-              key={option.value}
-              style={[
-                styles.optionChip,
-                selectedPriority === option.value && styles.optionChipActive
-              ]}
-              onPress={() => setValue("priority", option.value, { shouldValidate: true })}
-            >
-              <Text
-                style={[
-                  styles.optionChipText,
-                  selectedPriority === option.value && styles.optionChipTextActive
-                ]}
+              <View style={styles.field}>
+                <Text style={styles.label}>Departamento destino</Text>
+
+                {departmentsQuery.isLoading ? (
+                  <View style={styles.inlineLoader}>
+                    <ActivityIndicator size="small" color="#123A74" />
+                    <Text style={styles.inlineLoaderText}>Carregando departamentos...</Text>
+                  </View>
+                ) : null}
+
+                {!departmentsQuery.isLoading && activeDepartments.length > 0 ? (
+                  <>
+                    <Pressable
+                      style={styles.selectField}
+                      onPress={() => setIsDepartmentListOpen((prev) => !prev)}
+                    >
+                      <Text
+                        style={[
+                          styles.selectText,
+                          !selectedDepartment && styles.selectPlaceholder
+                        ]}
+                      >
+                        {selectedDepartment?.name ?? "Selecione um departamento"}
+                      </Text>
+                      {isDepartmentListOpen ? (
+                        <ChevronUp size={16} color="#64748b" />
+                      ) : (
+                        <ChevronDown size={16} color="#64748b" />
+                      )}
+                    </Pressable>
+
+                    {isDepartmentListOpen ? (
+                      <View style={styles.departmentList}>
+                        {activeDepartments.map((department) => {
+                          const isSelected = selectedDepartmentId === department.id;
+
+                          return (
+                            <Pressable
+                              key={department.id}
+                              style={[
+                                styles.departmentOption,
+                                isSelected && styles.departmentOptionSelected
+                              ]}
+                              onPress={() => {
+                                setValue("targetDepartmentId", department.id, {
+                                  shouldValidate: true,
+                                  shouldDirty: true
+                                });
+                                setIsDepartmentListOpen(false);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.departmentOptionText,
+                                  isSelected && styles.departmentOptionTextSelected
+                                ]}
+                              >
+                                {department.name}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {!departmentsQuery.isLoading && activeDepartments.length === 0 ? (
+                  <Text style={styles.helperText}>Nenhum departamento ativo encontrado.</Text>
+                ) : null}
+
+                {errors.targetDepartmentId?.message ? (
+                  <Text style={styles.errorText}>{errors.targetDepartmentId.message}</Text>
+                ) : null}
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Prioridade</Text>
+                <View style={styles.priorityRow}>
+                  {PRIORITY_OPTIONS.map((option) => {
+                    const isSelected = selectedPriority === option.value;
+
+                    return (
+                      <Pressable
+                        key={option.value}
+                        style={[styles.priorityOption, isSelected && styles.priorityOptionSelected]}
+                        onPress={() => setValue("priority", option.value, { shouldValidate: true })}
+                      >
+                        <Text style={[styles.priorityOptionLabel, isSelected && styles.priorityOptionLabelSelected]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {errors.priority?.message ? <Text style={styles.errorText}>{errors.priority.message}</Text> : null}
+              </View>
+
+              <Controller
+                control={control}
+                name="description"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Descricao</Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      multiline
+                      numberOfLines={5}
+                      textAlignVertical="top"
+                      placeholder="Descreva o problema ou solicitacao com detalhes"
+                      placeholderTextColor="#94a3b8"
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                    />
+                    {errors.description?.message ? (
+                      <Text style={styles.errorText}>{errors.description.message}</Text>
+                    ) : null}
+                  </View>
+                )}
+              />
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Anexos</Text>
+                <View style={styles.attachmentBox}>
+                  <View style={styles.attachmentCircle}>
+                    <Paperclip size={16} color="#d4a90d" />
+                  </View>
+                  <Text style={styles.attachmentTitle}>Adicionar no detalhe</Text>
+                  <Text style={styles.attachmentSubtitle}>
+                    Os anexos podem ser enviados apos abrir o chamado.
+                  </Text>
+                </View>
+              </View>
+
+              {submitErrorMessage ? (
+                <View style={styles.submitErrorBox}>
+                  <Text style={styles.submitErrorTitle}>Nao foi possivel criar o chamado</Text>
+                  <Text style={styles.submitErrorText}>{submitErrorMessage}</Text>
+                </View>
+              ) : null}
+
+              <Pressable
+                style={[styles.submitButton, createTicketMutation.isPending && styles.submitButtonDisabled]}
+                disabled={createTicketMutation.isPending}
+                onPress={handleSubmit(onSubmit)}
               >
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {errors.priority?.message ? <Text style={styles.errorText}>{errors.priority.message}</Text> : null}
-      </View>
+                {createTicketMutation.isPending ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Abrir chamado</Text>
+                )}
+              </Pressable>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Departamento de destino</Text>
-        {departmentsQuery.isLoading ? (
-          <View style={styles.inlineLoader}>
-            <ActivityIndicator size="small" color="#0b3f77" />
-            <Text style={styles.inlineLoaderText}>Carregando departamentos...</Text>
-          </View>
-        ) : null}
-
-        {!departmentsQuery.isLoading && activeDepartments.length === 0 ? (
-          <Text style={styles.helperText}>Nenhum departamento ativo encontrado.</Text>
-        ) : null}
-
-        <View style={styles.optionsWrap}>
-          {activeDepartments.map((department) => (
-            <Pressable
-              key={department.id}
-              style={[
-                styles.optionChip,
-                selectedDepartmentId === department.id && styles.optionChipActive
-              ]}
-              onPress={() =>
-                setValue("targetDepartmentId", department.id, {
-                  shouldValidate: true,
-                  shouldDirty: true
-                })
-              }
-            >
-              <Text
-                style={[
-                  styles.optionChipText,
-                  selectedDepartmentId === department.id && styles.optionChipTextActive
-                ]}
+              <Pressable
+                style={styles.cancelButton}
+                onPress={() => router.back()}
+                disabled={createTicketMutation.isPending}
               >
-                {department.name}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {errors.targetDepartmentId?.message ? (
-          <Text style={styles.errorText}>{errors.targetDepartmentId.message}</Text>
-        ) : null}
-      </View>
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
 
-      {submitErrorMessage ? (
-        <View style={styles.submitErrorBox}>
-          <Text style={styles.submitErrorTitle}>Nao foi possivel criar o chamado</Text>
-          <Text style={styles.submitErrorText}>{submitErrorMessage}</Text>
+          <MobileBottomNav />
         </View>
-      ) : null}
-
-        <Pressable
-          style={[styles.submitButton, createTicketMutation.isPending && styles.submitButtonDisabled]}
-          disabled={createTicketMutation.isPending}
-          onPress={handleSubmit(onSubmit)}
-        >
-          {createTicketMutation.isPending ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Criar chamado</Text>
-          )}
-        </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#f3f4f7"
+  },
   container: {
     flex: 1,
-    backgroundColor: "#f5f7fb"
+    backgroundColor: "#f3f4f7"
   },
   content: {
-    padding: 16,
-    gap: 14,
-    paddingBottom: 24
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 120,
+    gap: 14
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#0f172a"
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  headerIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#dbe2ef",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff"
+  },
+  headerTitle: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#102448"
+  },
+  headerLogo: {
+    width: 132,
+    height: 22
   },
   subtitle: {
+    color: "#475569",
     fontSize: 14,
-    color: "#64748b"
+    lineHeight: 20
+  },
+  formCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#dbe2ef",
+    backgroundColor: "#ffffff",
+    padding: 16,
+    gap: 14
   },
   field: {
     gap: 8
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "700",
     color: "#334155"
   },
   input: {
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 10,
+    borderColor: "#dbe2ef",
+    borderRadius: 12,
     backgroundColor: "#ffffff",
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
+    paddingVertical: 12,
+    fontSize: 16,
     color: "#0f172a"
   },
   textArea: {
-    minHeight: 110
+    minHeight: 120
   },
-  optionsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  optionChip: {
+  selectField: {
+    minHeight: 48,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 999,
+    borderColor: "#dbe2ef",
+    borderRadius: 12,
     backgroundColor: "#ffffff",
     paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
   },
-  optionChipActive: {
-    backgroundColor: "#0b3f77",
-    borderColor: "#0b3f77"
-  },
-  optionChipText: {
-    fontSize: 13,
-    color: "#334155",
+  selectText: {
+    color: "#1e293b",
+    fontSize: 15,
     fontWeight: "600"
   },
-  optionChipTextActive: {
-    color: "#ffffff"
+  selectPlaceholder: {
+    color: "#94a3b8",
+    fontWeight: "500"
+  },
+  departmentList: {
+    borderWidth: 1,
+    borderColor: "#dbe2ef",
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    overflow: "hidden"
+  },
+  departmentOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eef2f7"
+  },
+  departmentOptionSelected: {
+    backgroundColor: "#eff6ff"
+  },
+  departmentOptionText: {
+    fontSize: 14,
+    color: "#334155"
+  },
+  departmentOptionTextSelected: {
+    color: "#123A74",
+    fontWeight: "700"
+  },
+  priorityRow: {
+    flexDirection: "row",
+    gap: 10
+  },
+  priorityOption: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#cfd7e6",
+    borderRadius: 999,
+    backgroundColor: "#ffffff",
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  priorityOptionSelected: {
+    borderColor: "#1d4ed8",
+    backgroundColor: "#eff6ff"
+  },
+  priorityOptionLabel: {
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "800",
+    textTransform: "uppercase"
+  },
+  priorityOptionLabelSelected: {
+    color: "#123A74"
+  },
+  attachmentBox: {
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "#cfd7e6",
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    gap: 6
+  },
+  attachmentCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#fef3c7",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  attachmentTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#334155"
+  },
+  attachmentSubtitle: {
+    fontSize: 12,
+    color: "#64748b",
+    textAlign: "center",
+    paddingHorizontal: 10
   },
   helperText: {
     fontSize: 13,
@@ -297,7 +489,7 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   submitErrorBox: {
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#fecaca",
     backgroundColor: "#fef2f2",
@@ -314,10 +506,9 @@ const styles = StyleSheet.create({
     fontSize: 13
   },
   submitButton: {
-    marginTop: 4,
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: "#0b3f77",
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: "center"
   },
   submitButtonDisabled: {
@@ -325,7 +516,20 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: "#ffffff",
-    fontSize: 15,
+    fontSize: 18,
+    fontWeight: "700"
+  },
+  cancelButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#d4dce9",
+    backgroundColor: "#ffffff",
+    paddingVertical: 12,
+    alignItems: "center"
+  },
+  cancelButtonText: {
+    color: "#334155",
+    fontSize: 16,
     fontWeight: "700"
   }
 });

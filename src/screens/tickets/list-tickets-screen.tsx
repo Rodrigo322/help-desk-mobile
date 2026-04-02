@@ -1,9 +1,10 @@
-import { Ionicons } from "@expo/vector-icons";
+import { ChevronDown, Menu, Plus, Search, UserRound } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -142,7 +143,7 @@ function TicketRow({ ticket, onPress }: TicketRowProps) {
 
       <View style={styles.ticketFooter}>
         <View style={styles.userWrap}>
-          <Ionicons name="person-circle" size={18} color="#f97316" />
+          <UserRound size={18} color="#f97316" />
           <Text style={styles.userText}>{ticket.createdByUserName ?? "Solicitante"}</Text>
         </View>
         <Text style={styles.ticketDate}>{formatDate(ticket.createdAt)}</Text>
@@ -193,11 +194,15 @@ export function TicketsScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable style={styles.headerIcon}>
-            <Ionicons name="menu" size={18} color="#f97316" />
+            <Menu size={18} color="#f97316" />
           </Pressable>
-          <Text style={styles.headerTitle}>Chamados</Text>
+          <Image
+            source={require("../../../assets/brand/new-holland-blue.png")}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
           <Pressable style={styles.headerIcon}>
-            <Ionicons name="search-outline" size={18} color="#0f172a" />
+            <Search size={18} color="#0f172a" />
           </Pressable>
         </View>
 
@@ -207,7 +212,7 @@ export function TicketsScreen() {
             onPress={() => setStatusIndex((prev) => (prev + 1) % STATUS_FILTERS.length)}
           >
             <Text style={styles.filterButtonText}>{STATUS_FILTERS[statusIndex]?.label}</Text>
-            <Ionicons name="chevron-down" size={14} color="#334155" />
+            <ChevronDown size={14} color="#334155" />
           </Pressable>
 
           <Pressable
@@ -215,7 +220,7 @@ export function TicketsScreen() {
             onPress={() => setPriorityIndex((prev) => (prev + 1) % PRIORITY_FILTERS.length)}
           >
             <Text style={styles.filterButtonText}>{PRIORITY_FILTERS[priorityIndex]?.label}</Text>
-            <Ionicons name="chevron-down" size={14} color="#334155" />
+            <ChevronDown size={14} color="#334155" />
           </Pressable>
 
           <Pressable
@@ -223,7 +228,7 @@ export function TicketsScreen() {
             onPress={() => setScopeIndex((prev) => (prev + 1) % SCOPES.length)}
           >
             <Text style={styles.filterButtonText}>{SCOPES[scopeIndex]?.label}</Text>
-            <Ionicons name="chevron-down" size={14} color="#334155" />
+            <ChevronDown size={14} color="#334155" />
           </Pressable>
         </View>
 
@@ -265,7 +270,7 @@ export function TicketsScreen() {
         />
 
         <Pressable style={styles.floatingButton} onPress={() => router.push("/tickets/create")}>
-          <Ionicons name="add" size={30} color="#0f172a" />
+          <Plus size={30} color="#0f172a" />
         </Pressable>
 
         <MobileBottomNav />
@@ -314,6 +319,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
     color: "#0f172a"
+  },
+  headerLogo: {
+    width: 150,
+    height: 24
   },
   filtersRow: {
     flexDirection: "row",

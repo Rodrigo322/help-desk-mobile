@@ -1,8 +1,9 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Bell, CheckCircle2, Clock3, Menu, Ticket } from "lucide-react-native";
 import { useRouter } from "expo-router";
-import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
+import { ScrollView, StyleSheet, Text, View, Pressable, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMemo } from "react";
+import { ReactNode } from "react";
 
 import { MobileBottomNav } from "../../components/layout/mobile-bottom-nav";
 import { useAuth } from "../../hooks/use-auth";
@@ -13,7 +14,7 @@ type StatCardProps = {
   title: string;
   value: string | number;
   variation: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: ReactNode;
   iconBg: string;
   variationColor: string;
   onPress: () => void;
@@ -31,7 +32,7 @@ function StatCard({
   return (
     <Pressable style={styles.statCard} onPress={onPress}>
       <View style={[styles.statIconWrap, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon} size={18} color="#0B3F77" />
+        {icon}
       </View>
       <View style={styles.statContent}>
         <Text style={styles.statTitle}>{title}</Text>
@@ -84,16 +85,20 @@ export function DashboardScreen() {
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.menuButton}>
-                <Ionicons name="menu" size={16} color="#334155" />
+                <Menu size={16} color="#334155" />
               </View>
               <View>
-                <Text style={styles.brand}>Justi Tratores</Text>
+                <Image
+                  source={require("../../../assets/brand/new-holland-blue.png")}
+                  style={styles.brandLogo}
+                  resizeMode="contain"
+                />
                 <Text style={styles.brandSub}>Gestao de Frota</Text>
               </View>
             </View>
             <View style={styles.headerRight}>
               <Pressable style={styles.iconButton} onPress={() => router.push("/notifications")}>
-                <Ionicons name="notifications-outline" size={18} color="#0f172a" />
+                <Bell size={18} color="#0f172a" />
               </Pressable>
               <Pressable style={styles.avatarButton} onPress={() => void signOut()}>
                 <Text style={styles.avatarText}>{(user?.name ?? "JT").slice(0, 2).toUpperCase()}</Text>
@@ -111,7 +116,7 @@ export function DashboardScreen() {
               title="Chamados abertos"
               value={openCount}
               variation={openCount > 0 ? `+${openCount}` : "+0"}
-              icon="ticket-outline"
+              icon={<Ticket size={18} color="#0B3F77" />}
               iconBg="#dbeafe"
               variationColor="#16a34a"
               onPress={() => router.push("/tickets")}
@@ -120,7 +125,7 @@ export function DashboardScreen() {
               title="Em andamento"
               value={inProgressCount}
               variation={inProgressCount > 0 ? `+${inProgressCount}` : "+0"}
-              icon="time-outline"
+              icon={<Clock3 size={18} color="#0B3F77" />}
               iconBg="#fef3c7"
               variationColor="#f97316"
               onPress={() => router.push("/tickets")}
@@ -129,7 +134,7 @@ export function DashboardScreen() {
               title="Resolvidos"
               value={resolvedCount}
               variation={resolvedCount > 0 ? `+${resolvedCount}` : "+0"}
-              icon="checkmark-circle-outline"
+              icon={<CheckCircle2 size={18} color="#0B3F77" />}
               iconBg="#dcfce7"
               variationColor="#16a34a"
               onPress={() => router.push("/tickets")}
@@ -138,7 +143,7 @@ export function DashboardScreen() {
               title="Notificacoes"
               value={unreadCount}
               variation={unreadCount > 0 ? `+${unreadCount}` : "+0"}
-              icon="notifications-outline"
+              icon={<Bell size={18} color="#0B3F77" />}
               iconBg="#ffe4e6"
               variationColor="#dc2626"
               onPress={() => router.push("/notifications")}
@@ -173,10 +178,11 @@ export function DashboardScreen() {
             ) : (
               recentNotifications.map((notification) => (
                 <View key={notification.id} style={styles.activityItem}>
-                  <MaterialCommunityIcons
-                    name="circle"
-                    size={8}
-                    color={notification.readAt ? "#94a3b8" : "#FACC15"}
+                  <View
+                    style={[
+                      styles.activityDot,
+                      { backgroundColor: notification.readAt ? "#94a3b8" : "#FACC15" }
+                    ]}
                   />
                   <View style={styles.activityContent}>
                     <Text style={styles.activityText} numberOfLines={2}>
@@ -238,6 +244,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: "#0B3F77"
+  },
+  brandLogo: {
+    width: 144,
+    height: 24
   },
   brandSub: {
     fontSize: 11,
@@ -386,6 +396,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8
+  },
+  activityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 4
   },
   activityContent: {
     flex: 1,

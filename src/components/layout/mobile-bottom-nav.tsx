@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Bell, Home, Ticket, UserRound } from "lucide-react-native";
 import { usePathname, useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -17,11 +17,7 @@ export function MobileBottomNav() {
   return (
     <View style={styles.container}>
       <Pressable style={styles.navItem} onPress={() => router.replace("/")}>
-        <Ionicons
-          name={isActivePath(pathname, "/") ? "home" : "home-outline"}
-          size={20}
-          color={isActivePath(pathname, "/") ? "#0B3F77" : "#94a3b8"}
-        />
+        <Home size={20} color={isActivePath(pathname, "/") ? "#0B3F77" : "#94a3b8"} />
         <Text
           style={[
             styles.navLabel,
@@ -33,11 +29,7 @@ export function MobileBottomNav() {
       </Pressable>
 
       <Pressable style={styles.navItem} onPress={() => router.replace("/tickets")}>
-        <Ionicons
-          name={isActivePath(pathname, "/tickets") ? "ticket" : "ticket-outline"}
-          size={20}
-          color={isActivePath(pathname, "/tickets") ? "#0B3F77" : "#94a3b8"}
-        />
+        <Ticket size={20} color={isActivePath(pathname, "/tickets") ? "#0B3F77" : "#94a3b8"} />
         <Text
           style={[
             styles.navLabel,
@@ -49,11 +41,7 @@ export function MobileBottomNav() {
       </Pressable>
 
       <Pressable style={styles.navItem} onPress={() => router.replace("/notifications")}>
-        <Ionicons
-          name={isActivePath(pathname, "/notifications") ? "notifications" : "notifications-outline"}
-          size={20}
-          color={isActivePath(pathname, "/notifications") ? "#0B3F77" : "#94a3b8"}
-        />
+        <Bell size={20} color={isActivePath(pathname, "/notifications") ? "#0B3F77" : "#94a3b8"} />
         <Text
           style={[
             styles.navLabel,
@@ -65,7 +53,7 @@ export function MobileBottomNav() {
       </Pressable>
 
       <Pressable style={styles.navItem} onPress={() => router.replace("/")}>
-        <Ionicons name="person-circle-outline" size={20} color="#94a3b8" />
+        <UserRound size={20} color="#94a3b8" />
         <Text style={styles.navLabel}>Perfil</Text>
       </Pressable>
     </View>
